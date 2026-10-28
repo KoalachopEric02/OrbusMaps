@@ -57,7 +57,7 @@ let pendingMarker = null;
 let editingMarkerId = null;
 let customLocations = [];
 let deletedLocations = [];
-let locations = [];
+let locations = buildLocations();
 
 function buildLocations() {
   return builtInLocations
@@ -67,7 +67,6 @@ function buildLocations() {
 
 function resetMarkerForm() {
   editingMarkerId = null;
-  pendingMarker = null;
   document.getElementById('markerName').value = '';
   document.getElementById('markerDescription').value = '';
   document.getElementById('markerType').value = 'dungeon';
@@ -450,6 +449,7 @@ document.getElementById('listButton').addEventListener('click', () => {
 
 document.getElementById('addMarkerButton').onclick = () => {
   document.getElementById('details').classList.remove('open');
+  pendingMarker = null;
   resetMarkerForm();
   document.getElementById('addMarkerPanel').classList.add('open');
   document.getElementById('markerName').focus();
@@ -457,6 +457,7 @@ document.getElementById('addMarkerButton').onclick = () => {
 
 document.getElementById('closeAddMarker').onclick = () => {
   document.getElementById('addMarkerPanel').classList.remove('open');
+  pendingMarker = null;
   resetMarkerForm();
 };
 
