@@ -29,17 +29,13 @@ const builtInLocations = cities
   .map(([name,x,y,description]) => ({id:`builtin:${name}`,name,x,y,type:'city',description}))
   .concat(trackerResources);
 
-const STORAGE_KEYS = {
-  markers: 'orbus-map-markers',
-  deleted: 'orbus-map-deleted'
-};
-
 const map = document.getElementById('map');
 const tiles = document.getElementById('tiles');
 const markers = document.getElementById('markers');
 const TILE = 256;
 const MIN_ZOOM = 2;
 const MAX_ZOOM = 5;
+const MAP_STATE_ENDPOINT = '/api/map-state';
 
 let zoom = 4;
 let camera = { x: 0, y: -12000 };
@@ -54,46 +50,59 @@ let customLocations = [];
 let deletedLocations = [];
 let locations = [];
 
-function readJSON(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : fallback;
-  } catch (error) {
-    console.error(`Could not read ${key}`, error);
-    return fallback;
-  }
-}
-
-function writeJSON(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    return true;
-  } catch (error) {
-    console.error(`Could not save ${key}`, error);
-    return false;
-  }
-}
-
 function buildLocations() {
   return builtInLocations
     .filter((loc) => !deletedLocations.includes(loc.id))
     .concat(customLocations);
 }
 
-function persistLocationState() {
-  const markersSaved = writeJSON(STORAGE_KEYS.markers, customLocations);
-  const deletedSaved = writeJSON(STORAGE_KEYS.deleted, [...new Set(deletedLocations)]);
-
-  if (!markersSaved || !deletedSaved) {
-    console.warn('Map persistence failed for one or more storage keys.');
+async function loadMapState() {
+  try {
+    const response = await fetch(MAP_STATE_ENDPOINT, { headers: { 'Accept': 'application/json' } });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch map state: ${response.status}`);
+    }
+    const data = await response.json();
+    customLocations = Array.isArray(data.customLocations) ? data.customLocations : [];
+    deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : [];
+    locations = buildLocations();
+    renderList();
+    draw();
+    return true;
+  } catch (error) {
+    console.error('Could not load map state from the database.', error);
+    return false;
   }
+}
 
-  locations = buildLocations();
-  renderList();
-  draw();
-  return markersSaved && deletedSaved;
+async function persistLocationState() {
+  const payload = {
+    customLocations,
+    deletedLocations: [...new Set(deletedLocations)]
+  };
+
+  try {
+    const response = await fetch(MAP_STATE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`Persist failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    customLocations = Array.isArray(data.customLocations) ? data.customLocations : customLocations;
+    deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : deletedLocations;
+    locations = buildLocations();
+    renderList();
+    draw();
+    return true;
+  } catch (error) {
+    console.error('Could not sync map state to the database.', error);
+    return false;
+  }
 }
 
 window.orbusMapDB = {
@@ -103,17 +112,17 @@ window.orbusMapDB = {
       deletedLocations: [...deletedLocations]
     };
   },
-  saveState() {
+  async saveState() {
     return persistLocationState();
   },
-  reset() {
+  async reset() {
     customLocations = [];
     deletedLocations = [];
-    localStorage.removeItem(STORAGE_KEYS.markers);
-    localStorage.removeItem(STORAGE_KEYS.deleted);
+    const result = await persistLocationState();
     locations = buildLocations();
     renderList();
     draw();
+    return result;
   }
 };
 
@@ -304,7 +313,7 @@ function renderList() {
 
 let panStart = null;
 
-map.addEventListener('pointerdown', (event) => {
+map.addEventListener('pointerdown', async (event) => {
   if (pendingMarker && !event.target.closest('.marker')) {
     const rect = map.getBoundingClientRect();
     const cameraPixel = worldToPixel(camera.x, camera.y, zoom);
@@ -324,7 +333,7 @@ map.addEventListener('pointerdown', (event) => {
     };
 
     customLocations.push(newMarker);
-    persistLocationState();
+    await persistLocationState();
     selected = newMarker.name;
     openDetails(newMarker);
     pendingMarker = null;
@@ -436,7 +445,7 @@ document.getElementById('placeMarker').onclick = () => {
   document.getElementById('markerDescription').value = '';
 };
 
-document.getElementById('details').addEventListener('click', (event) => {
+document.getElementById('details').addEventListener('click', async (event) => {
   const button = event.target.closest('[data-delete-location]');
   if (!button) return;
 
@@ -453,17 +462,15 @@ document.getElementById('details').addEventListener('click', (event) => {
     customLocations = customLocations.filter((item) => item.id !== loc.id);
   }
 
-  persistLocationState();
+  await persistLocationState();
   selected = null;
   document.getElementById('details').classList.remove('open');
 });
 
 window.addEventListener('resize', draw);
 
-customLocations = readJSON(STORAGE_KEYS.markers, []);
-deletedLocations = readJSON(STORAGE_KEYS.deleted, []);
-locations = buildLocations();
 camera = { x: 24000, y: -3500 };
 zoom = 4;
+loadMapState();
 renderList();
 draw();
