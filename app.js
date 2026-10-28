@@ -29,13 +29,13 @@ const builtInLocations = cities
   .map(([name,x,y,description]) => ({id:`builtin:${name}`,name,x,y,type:'city',description}))
   .concat(trackerResources);
 
+const MAP_STATE_ENDPOINT = '/api/map-state';
 const map = document.getElementById('map');
 const tiles = document.getElementById('tiles');
 const markers = document.getElementById('markers');
 const TILE = 256;
 const MIN_ZOOM = 2;
 const MAX_ZOOM = 5;
-const MAP_STATE_ENDPOINT = '/api/map-state';
 
 let zoom = 4;
 let camera = { x: 0, y: -12000 };
@@ -46,6 +46,7 @@ let start = { x: 0, y: 0 };
 let activeFilter = 'all';
 let selected = null;
 let pendingMarker = null;
+let editingMarkerId = null;
 let customLocations = [];
 let deletedLocations = [];
 let locations = [];
@@ -56,9 +57,41 @@ function buildLocations() {
     .concat(customLocations);
 }
 
+function resetMarkerPanelMode() {
+  editingMarkerId = null;
+  pendingMarker = null;
+  const nameInput = document.getElementById('markerName');
+  const descriptionInput = document.getElementById('markerDescription');
+  const typeInput = document.getElementById('markerType');
+  const placeButton = document.getElementById('placeMarker');
+
+  if (nameInput) nameInput.value = '';
+  if (descriptionInput) descriptionInput.value = '';
+  if (typeInput) typeInput.value = 'dungeon';
+  if (placeButton) placeButton.textContent = 'Place on Map';
+}
+
+function openMarkerFormForEdit(marker) {
+  const nameInput = document.getElementById('markerName');
+  const typeInput = document.getElementById('markerType');
+  const descriptionInput = document.getElementById('markerDescription');
+  const placeButton = document.getElementById('placeMarker');
+
+  editingMarkerId = marker.id;
+  pendingMarker = null;
+
+  if (nameInput) nameInput.value = marker.name || '';
+  if (typeInput) typeInput.value = marker.type || 'dungeon';
+  if (descriptionInput) descriptionInput.value = marker.description || '';
+  if (placeButton) placeButton.textContent = 'Save Changes';
+
+  document.getElementById('addMarkerPanel').classList.add('open');
+  nameInput.focus();
+}
+
 async function loadMapState() {
   try {
-    const response = await fetch(MAP_STATE_ENDPOINT, { headers: { 'Accept': 'application/json' } });
+    const response = await fetch(MAP_STATE_ENDPOINT, { headers: { Accept: 'application/json' } });
     if (!response.ok) {
       throw new Error(`Failed to fetch map state: ${response.status}`);
     }
@@ -279,6 +312,13 @@ function openDetails(loc) {
     const customTag = document.createElement('span');
     customTag.textContent = 'Custom marker';
     detailMeta.appendChild(customTag);
+
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'edit-button';
+    editButton.dataset.editLocation = loc.id;
+    editButton.textContent = 'Edit marker';
+    detailMeta.appendChild(editButton);
   }
 
   const deleteButton = document.createElement('button');
@@ -418,38 +458,69 @@ document.getElementById('listButton').addEventListener('click', () => {
 
 document.getElementById('addMarkerButton').onclick = () => {
   document.getElementById('details').classList.remove('open');
+  resetMarkerPanelMode();
   document.getElementById('addMarkerPanel').classList.add('open');
   document.getElementById('markerName').focus();
 };
 
 document.getElementById('closeAddMarker').onclick = () => {
   document.getElementById('addMarkerPanel').classList.remove('open');
-  pendingMarker = null;
+  resetMarkerPanelMode();
 };
 
-document.getElementById('placeMarker').onclick = () => {
+document.getElementById('placeMarker').onclick = async () => {
   const name = document.getElementById('markerName').value.trim();
   if (!name) {
     document.getElementById('markerName').focus();
     return;
   }
 
-  pendingMarker = {
-    name,
-    type: document.getElementById('markerType').value,
-    description: document.getElementById('markerDescription').value.trim()
-  };
+  const type = document.getElementById('markerType').value;
+  const description = document.getElementById('markerDescription').value.trim();
 
+  if (editingMarkerId) {
+    const markerIndex = customLocations.findIndex((loc) => loc.id === editingMarkerId);
+    if (markerIndex >= 0) {
+      const existing = customLocations[markerIndex];
+      customLocations[markerIndex] = {
+        ...existing,
+        name,
+        type,
+        description: description || existing.description || 'Custom marker updated.'
+      };
+      await persistLocationState();
+      selected = name;
+      const updated = customLocations[markerIndex];
+      openDetails(updated);
+    }
+
+    resetMarkerPanelMode();
+    document.getElementById('addMarkerPanel').classList.remove('open');
+    return;
+  }
+
+  pendingMarker = { name, type, description };
   document.getElementById('addMarkerPanel').classList.remove('open');
   document.getElementById('markerName').value = '';
   document.getElementById('markerDescription').value = '';
 };
 
 document.getElementById('details').addEventListener('click', async (event) => {
-  const button = event.target.closest('[data-delete-location]');
-  if (!button) return;
+  const editButton = event.target.closest('[data-edit-location]');
+  if (editButton) {
+    const id = editButton.dataset.editLocation;
+    const loc = customLocations.find((item) => item.id === id);
+    if (loc) {
+      document.getElementById('details').classList.remove('open');
+      openMarkerFormForEdit(loc);
+    }
+    return;
+  }
 
-  const id = button.dataset.deleteLocation;
+  const deleteButton = event.target.closest('[data-delete-location]');
+  if (!deleteButton) return;
+
+  const id = deleteButton.dataset.deleteLocation;
   const loc = locations.find((item) => item.id === id) || customLocations.find((item) => item.id === id);
   if (!loc) return;
 
