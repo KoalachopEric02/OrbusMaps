@@ -26,16 +26,7 @@ const trackerResources = [
 ];
 
 const builtInLocations = cities
-  .map(([name, x, y, description]) => ({id:`builtin:${name}`, name, x, y, type:'city', description}))
-  .concat(Object.entries(dungeonData).map(([name, [x, y, description]]) => ({
-    id: `builtin:${name}`,
-    name,
-    x,
-    y,
-    type: 'dungeon',
-    description
-  })))
-  .concat(trackerResources);
+  .map(([name, x, y, description]) => ({id:`builtin:${name}`, name, x, y, type:'city', description}));
 
 const MAP_STATE_ENDPOINT = '/api/map-state';
 const LOCAL_STATE_KEY = 'orbus-map-state';
@@ -44,7 +35,7 @@ const tiles = document.getElementById('tiles');
 const markers = document.getElementById('markers');
 const TILE = 256;
 const MIN_ZOOM = 2;
-const MAX_ZOOM = 4;
+const MAX_ZOOM = 5;
 
 let zoom = 4;
 let camera = {x: 0, y: -12000};
@@ -110,6 +101,7 @@ async function loadMapState() {
     const data = await response.json();
     customLocations = Array.isArray(data.customLocations) ? data.customLocations : [];
     deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : [];
+    saveLocalState();
   } catch (_error) {
     loadLocalState();
   }
@@ -136,6 +128,7 @@ async function persistLocationState() {
     const data = await response.json();
     customLocations = Array.isArray(data.customLocations) ? data.customLocations : customLocations;
     deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : deletedLocations;
+    saveLocalState();
   } catch (_error) {
     saveLocalState();
   }
@@ -316,10 +309,10 @@ function openDetails(loc) {
   type.textContent = `Type: ${loc.type}`;
   detailMeta.appendChild(type);
 
-  if (loc.id && !loc.id.startsWith('builtin:')) {
-    const customTag = document.createElement('span');
-    customTag.textContent = 'Custom marker';
-    detailMeta.appendChild(customTag);
+  if (loc.id) {
+    const markerTag = document.createElement('span');
+    markerTag.textContent = loc.id.startsWith('builtin:') ? 'Settlement marker' : 'Custom marker';
+    detailMeta.appendChild(markerTag);
 
     const editButton = document.createElement('button');
     editButton.type = 'button';
@@ -492,6 +485,9 @@ document.getElementById('placeMarker').onclick = async () => {
 
   if (editingMarkerId) {
     const index = customLocations.findIndex((loc) => loc.id === editingMarkerId);
+    const builtIn = builtInLocations.find((loc) => loc.id === editingMarkerId);
+    let editedMarker;
+
     if (index >= 0) {
       customLocations[index] = {
         ...customLocations[index],
@@ -499,9 +495,23 @@ document.getElementById('placeMarker').onclick = async () => {
         type,
         description: description || customLocations[index].description || 'Custom marker updated.'
       };
+      editedMarker = customLocations[index];
+    } else if (builtIn) {
+      editedMarker = {
+        ...builtIn,
+        id: `custom:edit:${builtIn.id}:${Date.now()}`,
+        name,
+        type,
+        description: description || builtIn.description || 'Settlement marker updated.'
+      };
+      customLocations.push(editedMarker);
+      deletedLocations.push(builtIn.id);
+    }
+
+    if (editedMarker) {
       await persistLocationState();
       selected = name;
-      openDetails(customLocations[index]);
+      openDetails(editedMarker);
     }
 
     resetMarkerForm();
@@ -518,7 +528,8 @@ document.getElementById('details').addEventListener('click', async (event) => {
   const editButton = event.target.closest('[data-edit-location]');
   if (editButton) {
     const id = editButton.dataset.editLocation;
-    const loc = customLocations.find((item) => item.id === id);
+    const loc = customLocations.find((item) => item.id === id)
+      || builtInLocations.find((item) => item.id === id);
     if (loc) {
       document.getElementById('details').classList.remove('open');
       openMarkerFormForEdit(loc);
