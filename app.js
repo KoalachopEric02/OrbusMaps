@@ -27,6 +27,14 @@ const trackerResources = [
 
 const builtInLocations = cities
   .map(([name, x, y, description]) => ({id:`builtin:${name}`, name, x, y, type:'city', description}))
+  .concat(Object.entries(dungeonData).map(([name, [x, y, description]]) => ({
+    id: `builtin:${name}`,
+    name,
+    x,
+    y,
+    type: 'dungeon',
+    description
+  })))
   .concat(trackerResources);
 
 const MAP_STATE_ENDPOINT = '/api/map-state';
@@ -49,7 +57,7 @@ let pendingMarker = null;
 let editingMarkerId = null;
 let customLocations = [];
 let deletedLocations = [];
-let locations = [];
+let locations = buildLocations();
 
 function buildLocations() {
   return builtInLocations
@@ -59,7 +67,6 @@ function buildLocations() {
 
 function resetMarkerForm() {
   editingMarkerId = null;
-  pendingMarker = null;
   document.getElementById('markerName').value = '';
   document.getElementById('markerDescription').value = '';
   document.getElementById('markerType').value = 'dungeon';
@@ -216,7 +223,7 @@ function draw() {
 
       const img = document.createElement('img');
       img.className = 'map-tile';
-      img.src = `tiles/skyrim/${sourceZoom}/${sx}/${sy}.png`;
+      img.src = `tiles/skyrim/${sourceZoom}/${sx}/${sy}.jpg`;
       img.style.left = `${originX + x * tileScreen}px`;
       img.style.top = `${originY + y * tileScreen}px`;
       img.style.width = `${tileScreen}px`;
@@ -245,8 +252,8 @@ function drawMarkers(originX, originY) {
     const marker = document.createElement('button');
     marker.type = 'button';
     marker.className = `marker ${loc.type}${selected === loc.name ? ' selected' : ''}`;
-    marker.style.left = `${originX + p.x - camera.x}px`;
-    marker.style.top = `${originY + p.y - camera.y}px`;
+    marker.style.left = `${originX + p.x}px`;
+    marker.style.top = `${originY + p.y}px`;
     marker.title = loc.name;
     marker.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -442,6 +449,7 @@ document.getElementById('listButton').addEventListener('click', () => {
 
 document.getElementById('addMarkerButton').onclick = () => {
   document.getElementById('details').classList.remove('open');
+  pendingMarker = null;
   resetMarkerForm();
   document.getElementById('addMarkerPanel').classList.add('open');
   document.getElementById('markerName').focus();
@@ -449,6 +457,7 @@ document.getElementById('addMarkerButton').onclick = () => {
 
 document.getElementById('closeAddMarker').onclick = () => {
   document.getElementById('addMarkerPanel').classList.remove('open');
+  pendingMarker = null;
   resetMarkerForm();
 };
 
