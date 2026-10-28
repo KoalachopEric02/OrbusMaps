@@ -27,9 +27,18 @@ const trackerResources = [
 
 const builtInLocations = cities
   .map(([name, x, y, description]) => ({id:`builtin:${name}`, name, x, y, type:'city', description}))
+  .concat(Object.entries(dungeonData).map(([name, [x, y, description]]) => ({
+    id: `builtin:${name}`,
+    name,
+    x,
+    y,
+    type: 'dungeon',
+    description
+  })))
   .concat(trackerResources);
 
 const MAP_STATE_ENDPOINT = '/api/map-state';
+const LOCAL_STATE_KEY = 'orbus-map-state';
 const map = document.getElementById('map');
 const tiles = document.getElementById('tiles');
 const markers = document.getElementById('markers');
@@ -49,7 +58,7 @@ let pendingMarker = null;
 let editingMarkerId = null;
 let customLocations = [];
 let deletedLocations = [];
-let locations = [];
+let locations = buildLocations();
 
 function buildLocations() {
   return builtInLocations
@@ -59,7 +68,6 @@ function buildLocations() {
 
 function resetMarkerForm() {
   editingMarkerId = null;
-  pendingMarker = null;
   document.getElementById('markerName').value = '';
   document.getElementById('markerDescription').value = '';
   document.getElementById('markerType').value = 'dungeon';
@@ -76,6 +84,24 @@ function openMarkerFormForEdit(marker) {
   document.getElementById('markerName').focus();
 }
 
+function loadLocalState() {
+  try {
+    const data = JSON.parse(localStorage.getItem(LOCAL_STATE_KEY) || '{}');
+    customLocations = Array.isArray(data.customLocations) ? data.customLocations : [];
+    deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : [];
+  } catch (_error) {
+    customLocations = [];
+    deletedLocations = [];
+  }
+}
+
+function saveLocalState() {
+  localStorage.setItem(LOCAL_STATE_KEY, JSON.stringify({
+    customLocations,
+    deletedLocations: [...new Set(deletedLocations)]
+  }));
+}
+
 async function loadMapState() {
   try {
     const response = await fetch(MAP_STATE_ENDPOINT, {headers: {'Accept': 'application/json'}});
@@ -84,14 +110,14 @@ async function loadMapState() {
     const data = await response.json();
     customLocations = Array.isArray(data.customLocations) ? data.customLocations : [];
     deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : [];
-    locations = buildLocations();
-    renderList();
-    draw();
-    return true;
-  } catch (error) {
-    console.error('Could not load map state from the database.', error);
-    return false;
+  } catch (_error) {
+    loadLocalState();
   }
+
+  locations = buildLocations();
+  renderList();
+  draw();
+  return true;
 }
 
 async function persistLocationState() {
@@ -110,14 +136,14 @@ async function persistLocationState() {
     const data = await response.json();
     customLocations = Array.isArray(data.customLocations) ? data.customLocations : customLocations;
     deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : deletedLocations;
-    locations = buildLocations();
-    renderList();
-    draw();
-    return true;
-  } catch (error) {
-    console.error('Could not sync map state to the database.', error);
-    return false;
+  } catch (_error) {
+    saveLocalState();
   }
+
+  locations = buildLocations();
+  renderList();
+  draw();
+  return true;
 }
 
 window.orbusMapDB = {
@@ -216,7 +242,7 @@ function draw() {
 
       const img = document.createElement('img');
       img.className = 'map-tile';
-      img.src = `tiles/skyrim/${sourceZoom}/${sx}/${sy}.png`;
+      img.src = `tiles/skyrim/${sourceZoom}/${sx}/${sy}.jpg`;
       img.style.left = `${originX + x * tileScreen}px`;
       img.style.top = `${originY + y * tileScreen}px`;
       img.style.width = `${tileScreen}px`;
@@ -245,8 +271,8 @@ function drawMarkers(originX, originY) {
     const marker = document.createElement('button');
     marker.type = 'button';
     marker.className = `marker ${loc.type}${selected === loc.name ? ' selected' : ''}`;
-    marker.style.left = `${originX + p.x - camera.x}px`;
-    marker.style.top = `${originY + p.y - camera.y}px`;
+    marker.style.left = `${originX + p.x}px`;
+    marker.style.top = `${originY + p.y}px`;
     marker.title = loc.name;
     marker.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -442,6 +468,7 @@ document.getElementById('listButton').addEventListener('click', () => {
 
 document.getElementById('addMarkerButton').onclick = () => {
   document.getElementById('details').classList.remove('open');
+  pendingMarker = null;
   resetMarkerForm();
   document.getElementById('addMarkerPanel').classList.add('open');
   document.getElementById('markerName').focus();
@@ -449,6 +476,7 @@ document.getElementById('addMarkerButton').onclick = () => {
 
 document.getElementById('closeAddMarker').onclick = () => {
   document.getElementById('addMarkerPanel').classList.remove('open');
+  pendingMarker = null;
   resetMarkerForm();
 };
 

@@ -5,6 +5,7 @@ const Database = require('better-sqlite3');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 const rootDir = __dirname;
 const dataDir = path.join(rootDir, 'data');
 
@@ -30,7 +31,13 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.static(rootDir));
 
 app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, status: 'ready' });
+  try {
+    readState();
+    db.prepare('PRAGMA quick_check').get();
+    res.json({ ok: true, status: 'ready', database: 'online' });
+  } catch (error) {
+    res.status(503).json({ ok: false, status: 'database unavailable' });
+  }
 });
 
 function readState() {
@@ -73,6 +80,6 @@ app.post('/api/map-state', (req, res) => {
   res.json({ customLocations, deletedLocations });
 });
 
-app.listen(PORT, () => {
-  console.log(`Orbus Maps server running on http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Orbus Maps server running at http://${HOST}:${PORT}`);
 });
