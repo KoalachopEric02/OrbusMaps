@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Orbus Map</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div class="brand-mark" aria-label="Bread">🍞</div>
+      <div class="brand-copy">
+        <span>ORBUS</span>
+        <strong>Map</strong>
+      </div>
+      <div class="header-actions">
+        <button id="listButton" class="icon-button" title="Toggle location list">☰</button>
+        <button id="addMarkerButton" class="icon-button add-marker-button" title="Add a marker">＋</button>
+      </div>
+    </header>
+
+    <section class="controls">
+      <label class="search-wrap">
+        <span>⌕</span>
+        <input id="search" type="search" placeholder="Search settlements, caves, holds…" autocomplete="off" />
+      </label>
+      <div id="filters" class="filters" aria-label="Map filters">
+        <button data-filter="all" class="active">All</button>
+        <button data-filter="city">Settlements</button>
+        <button data-filter="dungeon">Dungeons</button>
+        <button data-filter="resource">Resource Nodes</button>
+        <button data-filter="hunting">Hunting</button>
+      </div>
+    </section>
+
+    <section class="workspace">
+      <aside id="locationList" class="location-list" aria-label="Locations">
+        <div class="list-heading"><span id="resultCount">Locations</span><small>Click to focus</small></div>
+        <div id="locationItems"></div>
+      </aside>
+
+      <div id="map" class="map" role="application" aria-label="Interactive Skyrim map">
+        <div id="tiles" class="tiles"></div>
+        <div id="markers" class="markers"></div>
+        <div class="map-status"><span id="zoomLabel">Zoom 4</span><span id="coordLabel">Move over the map</span></div>
+        <div class="zoom-controls" aria-label="Zoom controls">
+          <button id="zoomIn" title="Zoom in">+</button>
+          <button id="zoomOut" title="Zoom out">−</button>
+        </div>
+      </div>
+
+      <div id="addMarkerPanel" class="add-marker-panel" aria-label="Add marker">
+        <button id="closeAddMarker" class="close" aria-label="Cancel adding marker">×</button>
+        <span class="detail-eyebrow">NEW MARKER</span>
+        <h2>Add Location</h2>
+        <label>Name<input id="markerName" type="text" placeholder="Location name" /></label>
+        <label>Type
+          <select id="markerType">
+            <option value="dungeon">Dungeon</option>
+            <option value="city">Settlement</option>
+            <option value="resource">Resource Node</option>
+            <option value="hunting">Hunting</option>
+          </select>
+        </label>
+        <label>Description<textarea id="markerDescription" placeholder="Notes about this location"></textarea></label>
+        <button id="placeMarker" class="primary-button">Place on Map</button>
+        <small>After choosing Place on Map, click the map at the desired location.</small>
+      </div>
+
+      <article id="details" class="details" aria-live="polite">
+        <button id="closeDetails" class="close" aria-label="Close details">×</button>
+        <span id="detailEyebrow" class="detail-eyebrow">SELECTED LOCATION</span>
+        <h2 id="detailName">Explore Skyrim</h2>
+        <p id="detailDescription">Choose a marker or select a location from the list to see its details.</p>
+        <div id="detailMeta" class="detail-meta"></div>
+      </article>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
