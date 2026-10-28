@@ -26,7 +26,7 @@ const trackerResources = [
 ];
 
 const builtInLocations = cities
-  .map(([name,x,y,description]) => ({id:`builtin:${name}`,name,x,y,type:'city',description}))
+  .map(([name, x, y, description]) => ({id:`builtin:${name}`, name, x, y, type:'city', description}))
   .concat(trackerResources);
 
 const MAP_STATE_ENDPOINT = '/api/map-state';
@@ -38,11 +38,11 @@ const MIN_ZOOM = 2;
 const MAX_ZOOM = 5;
 
 let zoom = 4;
-let camera = { x: 0, y: -12000 };
-let center = { x: 0, y: 0 };
+let camera = {x: 0, y: -12000};
+let center = {x: 0, y: 0};
 let dragging = false;
-let pointer = { x: 0, y: 0 };
-let start = { x: 0, y: 0 };
+let pointer = {x: 0, y: 0};
+let start = {x: 0, y: 0};
 let activeFilter = 'all';
 let selected = null;
 let pendingMarker = null;
@@ -57,44 +57,30 @@ function buildLocations() {
     .concat(customLocations);
 }
 
-function resetMarkerPanelMode() {
+function resetMarkerForm() {
   editingMarkerId = null;
   pendingMarker = null;
-  const nameInput = document.getElementById('markerName');
-  const descriptionInput = document.getElementById('markerDescription');
-  const typeInput = document.getElementById('markerType');
-  const placeButton = document.getElementById('placeMarker');
-
-  if (nameInput) nameInput.value = '';
-  if (descriptionInput) descriptionInput.value = '';
-  if (typeInput) typeInput.value = 'dungeon';
-  if (placeButton) placeButton.textContent = 'Place on Map';
+  document.getElementById('markerName').value = '';
+  document.getElementById('markerDescription').value = '';
+  document.getElementById('markerType').value = 'dungeon';
+  document.getElementById('placeMarker').textContent = 'Place on Map';
 }
 
 function openMarkerFormForEdit(marker) {
-  const nameInput = document.getElementById('markerName');
-  const typeInput = document.getElementById('markerType');
-  const descriptionInput = document.getElementById('markerDescription');
-  const placeButton = document.getElementById('placeMarker');
-
   editingMarkerId = marker.id;
-  pendingMarker = null;
-
-  if (nameInput) nameInput.value = marker.name || '';
-  if (typeInput) typeInput.value = marker.type || 'dungeon';
-  if (descriptionInput) descriptionInput.value = marker.description || '';
-  if (placeButton) placeButton.textContent = 'Save Changes';
-
+  document.getElementById('markerName').value = marker.name || '';
+  document.getElementById('markerType').value = marker.type || 'dungeon';
+  document.getElementById('markerDescription').value = marker.description || '';
+  document.getElementById('placeMarker').textContent = 'Save Changes';
   document.getElementById('addMarkerPanel').classList.add('open');
-  nameInput.focus();
+  document.getElementById('markerName').focus();
 }
 
 async function loadMapState() {
   try {
-    const response = await fetch(MAP_STATE_ENDPOINT, { headers: { Accept: 'application/json' } });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch map state: ${response.status}`);
-    }
+    const response = await fetch(MAP_STATE_ENDPOINT, {headers: {'Accept': 'application/json'}});
+    if (!response.ok) throw new Error(`Map state fetch failed: ${response.status}`);
+
     const data = await response.json();
     customLocations = Array.isArray(data.customLocations) ? data.customLocations : [];
     deletedLocations = Array.isArray(data.deletedLocations) ? data.deletedLocations : [];
@@ -109,21 +95,17 @@ async function loadMapState() {
 }
 
 async function persistLocationState() {
-  const payload = {
-    customLocations,
-    deletedLocations: [...new Set(deletedLocations)]
-  };
-
   try {
     const response = await fetch(MAP_STATE_ENDPOINT, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        customLocations,
+        deletedLocations: [...new Set(deletedLocations)]
+      })
     });
 
-    if (!response.ok) {
-      throw new Error(`Persist failed: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`Persist failed: ${response.status}`);
 
     const data = await response.json();
     customLocations = Array.isArray(data.customLocations) ? data.customLocations : customLocations;
@@ -175,12 +157,12 @@ function pixelToWorld(px, py, z = zoom) {
 
 function screenPoint(x, y) {
   const p = worldToPixel(x, y);
-  return { x: p.x - camera.x, y: p.y - camera.y };
+  return {x: p.x - camera.x, y: p.y - camera.y};
 }
 
 function resize() {
-  const r = map.getBoundingClientRect();
-  center = { x: r.width / 2, y: r.height / 2 };
+  const rect = map.getBoundingClientRect();
+  center = {x: rect.width / 2, y: rect.height / 2};
   render();
 }
 
@@ -251,6 +233,7 @@ function draw() {
 function drawMarkers(originX, originY) {
   markers.replaceChildren();
   const query = document.getElementById('search').value.trim().toLowerCase();
+
   const visible = locations.filter((loc) => {
     if (activeFilter !== 'all' && loc.type !== activeFilter) return false;
     if (!query) return true;
@@ -264,7 +247,7 @@ function drawMarkers(originX, originY) {
     marker.className = `marker ${loc.type}${selected === loc.name ? ' selected' : ''}`;
     marker.style.left = `${originX + p.x - camera.x}px`;
     marker.style.top = `${originY + p.y - camera.y}px`;
-    marker.title = `${loc.name}`;
+    marker.title = loc.name;
     marker.addEventListener('click', (event) => {
       event.stopPropagation();
       selectLocation(loc, false);
@@ -277,15 +260,14 @@ function selectLocation(loc, moveTo = false) {
   selected = loc.name;
   openDetails(loc);
   if (moveTo) {
-    camera = { x: loc.x, y: loc.y };
+    camera = {x: loc.x, y: loc.y};
     draw();
   }
   renderList();
 }
 
 function openDetails(loc) {
-  const details = document.getElementById('details');
-  details.classList.add('open');
+  document.getElementById('details').classList.add('open');
   document.getElementById('detailEyebrow').textContent = loc.type === 'city'
     ? 'SETTLEMENT'
     : loc.type === 'resource'
@@ -384,9 +366,9 @@ map.addEventListener('pointerdown', async (event) => {
   if (event.target.closest('.marker')) return;
 
   dragging = true;
-  pointer = { x: event.clientX, y: event.clientY };
+  pointer = {x: event.clientX, y: event.clientY};
   panStart = {
-    camera: { ...camera },
+    camera: {...camera},
     pixels: worldToPixel(camera.x, camera.y, zoom)
   };
   map.classList.add('dragging');
@@ -415,6 +397,7 @@ map.addEventListener('pointerup', () => {
   dragging = false;
   map.classList.remove('dragging');
 });
+
 map.addEventListener('pointercancel', () => {
   dragging = false;
   map.classList.remove('dragging');
@@ -423,7 +406,7 @@ map.addEventListener('pointercancel', () => {
 map.addEventListener('wheel', (event) => {
   event.preventDefault();
   zoomAt(event, event.deltaY < 0 ? 1 : -1);
-}, { passive: false });
+}, {passive: false});
 
 function zoomAt(event, change) {
   zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom + change));
@@ -445,6 +428,7 @@ document.getElementById('search').addEventListener('input', () => {
 document.getElementById('filters').addEventListener('click', (event) => {
   const button = event.target.closest('[data-filter]');
   if (!button) return;
+
   activeFilter = button.dataset.filter;
   document.querySelectorAll('#filters [data-filter]').forEach((item) => item.classList.toggle('active', item === button));
   renderList();
@@ -458,14 +442,14 @@ document.getElementById('listButton').addEventListener('click', () => {
 
 document.getElementById('addMarkerButton').onclick = () => {
   document.getElementById('details').classList.remove('open');
-  resetMarkerPanelMode();
+  resetMarkerForm();
   document.getElementById('addMarkerPanel').classList.add('open');
   document.getElementById('markerName').focus();
 };
 
 document.getElementById('closeAddMarker').onclick = () => {
   document.getElementById('addMarkerPanel').classList.remove('open');
-  resetMarkerPanelMode();
+  resetMarkerForm();
 };
 
 document.getElementById('placeMarker').onclick = async () => {
@@ -479,30 +463,27 @@ document.getElementById('placeMarker').onclick = async () => {
   const description = document.getElementById('markerDescription').value.trim();
 
   if (editingMarkerId) {
-    const markerIndex = customLocations.findIndex((loc) => loc.id === editingMarkerId);
-    if (markerIndex >= 0) {
-      const existing = customLocations[markerIndex];
-      customLocations[markerIndex] = {
-        ...existing,
+    const index = customLocations.findIndex((loc) => loc.id === editingMarkerId);
+    if (index >= 0) {
+      customLocations[index] = {
+        ...customLocations[index],
         name,
         type,
-        description: description || existing.description || 'Custom marker updated.'
+        description: description || customLocations[index].description || 'Custom marker updated.'
       };
       await persistLocationState();
       selected = name;
-      const updated = customLocations[markerIndex];
-      openDetails(updated);
+      openDetails(customLocations[index]);
     }
 
-    resetMarkerPanelMode();
+    resetMarkerForm();
     document.getElementById('addMarkerPanel').classList.remove('open');
     return;
   }
 
-  pendingMarker = { name, type, description };
+  pendingMarker = {name, type, description};
   document.getElementById('addMarkerPanel').classList.remove('open');
-  document.getElementById('markerName').value = '';
-  document.getElementById('markerDescription').value = '';
+  resetMarkerForm();
 };
 
 document.getElementById('details').addEventListener('click', async (event) => {
@@ -540,7 +521,7 @@ document.getElementById('details').addEventListener('click', async (event) => {
 
 window.addEventListener('resize', draw);
 
-camera = { x: 24000, y: -3500 };
+camera = {x: 24000, y: -3500};
 zoom = 4;
 loadMapState();
 renderList();
