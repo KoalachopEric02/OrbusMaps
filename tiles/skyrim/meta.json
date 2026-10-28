@@ -1,0 +1,15 @@
+{
+  "tileSize": 256,
+  "minZoom": 0,
+  "maxZoom": 5,
+  "nativePx": 16384,
+  "world": {
+    "minX": -262144,
+    "minY": -262144,
+    "maxX": 262144,
+    "maxY": 262144
+  },
+  "unitsPerCell": 4096,
+  "cells": 128,
+  "source": "Satellite World Map LOD textures (tamriel.32.*.dds)"
+}
