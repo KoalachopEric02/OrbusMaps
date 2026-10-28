@@ -44,7 +44,7 @@ const tiles = document.getElementById('tiles');
 const markers = document.getElementById('markers');
 const TILE = 256;
 const MIN_ZOOM = 2;
-const MAX_ZOOM = 5;
+const MAX_ZOOM = 4;
 
 let zoom = 4;
 let camera = {x: 0, y: -12000};
